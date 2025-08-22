@@ -52,11 +52,13 @@ class AlpacaClient:
 
     def find_next_friday_expiration(self) -> datetime.date:
         """
-        Finds the upcoming Friday expiration date.
+        Finds the upcoming Friday expiration date. If today is Friday, it returns next Friday.
         """
         today = datetime.date.today()
         days_until_friday = (4 - today.weekday() + 7) % 7
         next_friday = today + datetime.timedelta(days=days_until_friday)
+        if next_friday == today:
+            next_friday += datetime.timedelta(days=7)
         return next_friday
 
     def get_option_quote(self, symbol: str) -> dict:

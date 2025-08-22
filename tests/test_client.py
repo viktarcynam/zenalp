@@ -57,15 +57,28 @@ class TestAlpacaClient(unittest.TestCase):
         self.assertEqual(client.find_nearest_strike(100.0, strikes), 100.0)
 
     @patch('os.getenv')
-    def test_find_next_friday_expiration(self, mock_getenv):
+    @patch('client.datetime')
+    def test_find_next_friday_expiration(self, mock_datetime, mock_getenv):
         # Arrange
         mock_getenv.side_effect = ['test_key', 'test_secret']
         client = AlpacaClient()
 
-        # Act & Assert
-        today = datetime.date.today()
-        days_until_friday = (4 - today.weekday() + 7) % 7
-        expected_friday = today + datetime.timedelta(days=days_until_friday)
+        # we need to make sure timedelta is the real timedelta
+        mock_datetime.timedelta = datetime.timedelta
+
+        # Test case 1: Today is Monday
+        mock_datetime.date.today.return_value = datetime.date(2025, 8, 25) # A Monday
+        expected_friday = datetime.date(2025, 8, 29)
+        self.assertEqual(client.find_next_friday_expiration(), expected_friday)
+
+        # Test case 2: Today is Friday
+        mock_datetime.date.today.return_value = datetime.date(2025, 8, 29) # A Friday
+        expected_friday = datetime.date(2025, 9, 5) # Next Friday
+        self.assertEqual(client.find_next_friday_expiration(), expected_friday)
+
+        # Test case 3: Today is Saturday
+        mock_datetime.date.today.return_value = datetime.date(2025, 8, 30) # A Saturday
+        expected_friday = datetime.date(2025, 9, 5)
         self.assertEqual(client.find_next_friday_expiration(), expected_friday)
 
 if __name__ == '__main__':
