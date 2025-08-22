@@ -7,8 +7,7 @@ A CLI for trading options using the Alpaca API.
 1. **Install dependencies:**
 
    ```bash
-   pip install poetry
-   poetry install
+   pip install -r requirements.txt
    ```
 
 2. **Set up environment variables:**
@@ -24,16 +23,16 @@ A CLI for trading options using the Alpaca API.
 
 ## Usage
 
-The application provides three CLI commands:
+The application provides three CLI commands, which can be invoked by running the `cli.py` script.
 
-- `trade1`: The main command to trade options.
+- `trade`: The main command to trade options.
 - `orders`: To manage open orders.
 - `positions`: To view your current positions.
 
-### `trade1`
+### `trade`
 
 ```bash
-poetry run trade1 <SYMBOL>
+python3 cli.py trade <SYMBOL>
 ```
 
 This command will:
@@ -48,18 +47,18 @@ This command will:
 
 ```bash
 # List all open orders
-poetry run orders list
+python3 cli.py orders list
 
 # Cancel an order
-poetry run orders cancel <ORDER_ID>
+python3 cli.py orders cancel <ORDER_ID>
 
 # Replace an order
-poetry run orders replace <ORDER_ID>
+python3 cli.py orders replace <ORDER_ID> --price <NEW_PRICE>
 ```
 
 ### `positions`
 
 ```bash
 # List all positions
-poetry run positions list
+python3 cli.py positions list
 ```

@@ -1,12 +1,12 @@
 import unittest
 from unittest.mock import patch, MagicMock
 from click.testing import CliRunner
-from trade1.cli import main
+from cli import main
 import datetime
 
 class TestCli(unittest.TestCase):
 
-    @patch('trade1.cli.AlpacaClient')
+    @patch('cli.AlpacaClient')
     def test_trade_command(self, mock_alpaca_client):
         # Arrange
         mock_client_instance = mock_alpaca_client.return_value
@@ -54,7 +54,7 @@ class TestCli(unittest.TestCase):
         self.assertIn("Using expiration date: 2025-12-31", result.output)
         self.assertIn("Using nearest strike price: $150.00", result.output)
 
-    @patch('trade1.cli.AlpacaClient')
+    @patch('cli.AlpacaClient')
     def test_orders_list_command(self, mock_alpaca_client):
         # Arrange
         mock_client_instance = mock_alpaca_client.return_value
@@ -74,7 +74,7 @@ class TestCli(unittest.TestCase):
         self.assertEqual(result.exit_code, 0)
         self.assertIn("ID: order1, Symbol: AAPL, Side: buy, Qty: 1, Status: open", result.output)
 
-    @patch('trade1.cli.AlpacaClient')
+    @patch('cli.AlpacaClient')
     def test_positions_list_command(self, mock_alpaca_client):
         # Arrange
         mock_client_instance = mock_alpaca_client.return_value

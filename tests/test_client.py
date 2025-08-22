@@ -1,12 +1,12 @@
 import unittest
 from unittest.mock import patch, MagicMock
-from trade1.client import AlpacaClient
+from client import AlpacaClient
 import datetime
 
 class TestAlpacaClient(unittest.TestCase):
 
-    @patch('trade1.client.TradingClient')
-    @patch('trade1.client.OptionHistoricalDataClient')
+    @patch('client.TradingClient')
+    @patch('client.OptionHistoricalDataClient')
     @patch('os.getenv')
     def test_init(self, mock_getenv, mock_option_client, mock_trading_client):
         # Arrange
@@ -22,8 +22,8 @@ class TestAlpacaClient(unittest.TestCase):
         mock_option_client.assert_called_with('test_key', 'test_secret')
         self.assertIsNotNone(client)
 
-    @patch('trade1.client.TradingClient')
-    @patch('trade1.client.OptionHistoricalDataClient')
+    @patch('client.TradingClient')
+    @patch('client.OptionHistoricalDataClient')
     @patch('os.getenv')
     def test_get_latest_stock_price(self, mock_getenv, mock_option_client, mock_trading_client):
         # Arrange

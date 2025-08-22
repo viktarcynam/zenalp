@@ -1,7 +1,7 @@
 import click
 import time
 import datetime
-from trade1.client import AlpacaClient
+from client import AlpacaClient
 from alpaca.trading.enums import OrderSide
 
 @click.group()
