@@ -5,10 +5,11 @@ import datetime
 
 class TestAlpacaClient(unittest.TestCase):
 
+    @patch('client.StockHistoricalDataClient')
     @patch('client.TradingClient')
     @patch('client.OptionHistoricalDataClient')
     @patch('os.getenv')
-    def test_init(self, mock_getenv, mock_option_client, mock_trading_client):
+    def test_init(self, mock_getenv, mock_option_client, mock_trading_client, mock_stock_client):
         # Arrange
         mock_getenv.side_effect = ['test_key', 'test_secret']
 
@@ -20,26 +21,28 @@ class TestAlpacaClient(unittest.TestCase):
         mock_getenv.assert_any_call("APCA_API_SECRET_KEY")
         mock_trading_client.assert_called_with('test_key', 'test_secret', paper=True)
         mock_option_client.assert_called_with('test_key', 'test_secret')
+        mock_stock_client.assert_called_with('test_key', 'test_secret')
         self.assertIsNotNone(client)
 
+    @patch('client.StockHistoricalDataClient')
     @patch('client.TradingClient')
     @patch('client.OptionHistoricalDataClient')
     @patch('os.getenv')
-    def test_get_latest_stock_price(self, mock_getenv, mock_option_client, mock_trading_client):
+    def test_get_latest_stock_price(self, mock_getenv, mock_option_client, mock_trading_client, mock_stock_client):
         # Arrange
         mock_getenv.side_effect = ['test_key', 'test_secret']
         client = AlpacaClient()
 
         mock_quote = MagicMock()
         mock_quote.ask_price = 150.0
-        client.trading_client.get_stock_latest_quote.return_value = {'AAPL': mock_quote}
+        client.stock_data_client.get_stock_latest_quote.return_value = {'AAPL': mock_quote}
 
         # Act
         price = client.get_latest_stock_price('AAPL')
 
         # Assert
         self.assertEqual(price, 150.0)
-        client.trading_client.get_stock_latest_quote.assert_called_once()
+        client.stock_data_client.get_stock_latest_quote.assert_called_once()
 
     @patch('os.getenv')
     def test_find_nearest_strike(self, mock_getenv):

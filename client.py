@@ -2,6 +2,7 @@ import os
 from dotenv import load_dotenv
 from alpaca.trading.client import TradingClient
 from alpaca.data.historical.option import OptionHistoricalDataClient
+from alpaca.data.historical.stock import StockHistoricalDataClient
 from alpaca.trading.requests import MarketOrderRequest, LimitOrderRequest, ReplaceOrderRequest
 from alpaca.trading.enums import OrderSide, TimeInForce
 from alpaca.data.requests import StockLatestQuoteRequest, OptionChainRequest, OptionLatestQuoteRequest
@@ -25,13 +26,14 @@ class AlpacaClient:
 
         self.trading_client = TradingClient(self.api_key, self.secret_key, paper=True)
         self.option_data_client = OptionHistoricalDataClient(self.api_key, self.secret_key)
+        self.stock_data_client = StockHistoricalDataClient(self.api_key, self.secret_key)
 
     def get_latest_stock_price(self, symbol: str) -> float:
         """
         Gets the latest price of an underlying asset.
         """
         request_params = StockLatestQuoteRequest(symbol_or_symbols=symbol)
-        latest_quote = self.trading_client.get_stock_latest_quote(request_params)
+        latest_quote = self.stock_data_client.get_stock_latest_quote(request_params)
         return latest_quote[symbol].ask_price
 
     def get_option_chain(self, symbol: str) -> dict:
