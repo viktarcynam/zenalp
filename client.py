@@ -75,7 +75,7 @@ class AlpacaClient:
             symbol=symbol,
             qty=qty,
             side=side,
-            time_in_force=TimeInForce.GTC,
+            time_in_force=TimeInForce.DAY,
             limit_price=limit_price
         )
         order = self.trading_client.submit_order(order_data)
