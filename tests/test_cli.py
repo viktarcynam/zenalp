@@ -1,10 +1,25 @@
 import unittest
 from unittest.mock import patch, MagicMock
 from click.testing import CliRunner
-from cli import main
+from cli import main, parse_option_symbol
 import datetime
 
 class TestCli(unittest.TestCase):
+
+    def test_parse_option_symbol(self):
+        # Arrange
+        symbol = "AAPL251231C00150000"
+        underlying = "AAPL"
+
+        # Act
+        parsed = parse_option_symbol(symbol, underlying)
+
+        # Assert
+        self.assertIsNotNone(parsed)
+        self.assertEqual(parsed['symbol'], symbol)
+        self.assertEqual(parsed['expiration_date'], datetime.date(2025, 12, 31))
+        self.assertEqual(parsed['strike_price'], 150.0)
+        self.assertEqual(parsed['type'], 'call')
 
     @patch('cli.AlpacaClient')
     def test_trade_command(self, mock_alpaca_client):
@@ -12,21 +27,11 @@ class TestCli(unittest.TestCase):
         mock_client_instance = mock_alpaca_client.return_value
         mock_client_instance.get_latest_stock_price.return_value = 150.0
 
-        mock_contract = MagicMock()
-        mock_contract.expiration_date = '2025-12-31'
-        mock_contract.strike_price = 150.0
-        mock_contract.type = 'call'
-        mock_contract.symbol = 'AAPL251231C00150000'
-
-        mock_put_contract = MagicMock()
-        mock_put_contract.expiration_date = '2025-12-31'
-        mock_put_contract.strike_price = 150.0
-        mock_put_contract.type = 'put'
-        mock_put_contract.symbol = 'AAPL251231P00150000'
+        mock_snapshot = MagicMock()
 
         mock_client_instance.get_option_chain.return_value = {
-            'AAPL251231C00150000': mock_contract,
-            'AAPL251231P00150000': mock_put_contract,
+            'AAPL251231C00150000': mock_snapshot,
+            'AAPL251231P00150000': mock_snapshot,
         }
         mock_client_instance.find_next_friday_expiration.return_value = datetime.date(2025, 12, 31)
         mock_client_instance.find_nearest_strike.return_value = 150.0
@@ -48,7 +53,6 @@ class TestCli(unittest.TestCase):
         runner = CliRunner()
 
         # Act
-        # We can't test the interactive prompts easily, so we just test the first part
         result = runner.invoke(main, ['trade', 'AAPL'], input='buy\ncall\n1.0\n1.0\n')
 
         # Assert

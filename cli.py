@@ -1,8 +1,33 @@
 import click
 import time
 import datetime
+import re
 from client import AlpacaClient
 from alpaca.trading.enums import OrderSide
+
+def parse_option_symbol(symbol: str, underlying_symbol: str):
+    """
+    Parses an option symbol string to extract details.
+    """
+    # Remove underlying symbol from the start
+    details_str = symbol[len(underlying_symbol):]
+
+    # Extract date, type, and strike
+    match = re.match(r'(\d{6})([CP])(\d+)', details_str)
+    if not match:
+        return None
+
+    date_str, option_type, strike_str = match.groups()
+
+    expiration_date = datetime.datetime.strptime(date_str, '%y%m%d').date()
+    strike_price = float(strike_str) / 1000.0
+
+    return {
+        'symbol': symbol,
+        'expiration_date': expiration_date,
+        'strike_price': strike_price,
+        'type': 'call' if option_type == 'C' else 'put'
+    }
 
 @click.group()
 def main():
@@ -10,6 +35,13 @@ def main():
     A CLI for trading options using the Alpaca API.
     """
     pass
+
+class SimpleContract:
+    def __init__(self, data):
+        self.symbol = data['symbol']
+        self.expiration_date = data['expiration_date']
+        self.strike_price = data['strike_price']
+        self.type = data['type']
 
 @main.command()
 @click.argument('symbol')
@@ -25,16 +57,21 @@ def trade(symbol):
         current_price = client.get_latest_stock_price(symbol)
         click.echo(f"Current price of {symbol}: ${current_price:.2f}")
 
-        # 2. Get option chain
+        # 2. Get option chain and parse contracts
         option_chain = client.get_option_chain(symbol)
+        contracts = []
+        for option_symbol in option_chain.keys():
+            parsed_data = parse_option_symbol(option_symbol, symbol)
+            if parsed_data:
+                contracts.append(SimpleContract(parsed_data))
 
         # Extract unique expirations and strikes
-        expirations = sorted(list(set([contract.expiration_date for contract in option_chain.values()])))
-        strikes = sorted(list(set([contract.strike_price for contract in option_chain.values()])))
+        expirations = sorted(list(set([c.expiration_date for c in contracts])))
+        strikes = sorted(list(set([c.strike_price for c in contracts])))
 
         # 3. Find next Friday expiration
         today = datetime.date.today()
-        expirations_in_future = [exp for exp in expirations if datetime.datetime.strptime(exp, "%Y-%m-%d").date() >= today]
+        expirations_in_future = [exp for exp in expirations if exp >= today]
         if not expirations_in_future:
             click.echo("No future expiration dates found.")
             return
@@ -42,9 +79,8 @@ def trade(symbol):
         next_friday = client.find_next_friday_expiration()
 
         # Find closest expiration date to next_friday
-        target_expiration_str = min(expirations_in_future, key=lambda d: abs(datetime.datetime.strptime(d, "%Y-%m-%d").date() - next_friday))
+        target_expiration = min(expirations_in_future, key=lambda d: abs(d - next_friday))
 
-        target_expiration = datetime.datetime.strptime(target_expiration_str, "%Y-%m-%d").date()
         click.echo(f"Using expiration date: {target_expiration}")
 
         # 4. Find nearest strike
@@ -54,8 +90,8 @@ def trade(symbol):
         # 5. Find the call and put contracts
         call_contract = None
         put_contract = None
-        for contract in option_chain.values():
-            if contract.expiration_date == target_expiration_str and contract.strike_price == nearest_strike:
+        for contract in contracts:
+            if contract.expiration_date == target_expiration and contract.strike_price == nearest_strike:
                 if contract.type == 'call':
                     call_contract = contract
                 elif contract.type == 'put':
