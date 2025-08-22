@@ -24,7 +24,10 @@ class TestCli(unittest.TestCase):
         mock_put_contract.type = 'put'
         mock_put_contract.symbol = 'AAPL251231P00150000'
 
-        mock_client_instance.get_option_chain.return_value = [mock_contract, mock_put_contract]
+        mock_client_instance.get_option_chain.return_value = {
+            'AAPL251231C00150000': mock_contract,
+            'AAPL251231P00150000': mock_put_contract,
+        }
         mock_client_instance.find_next_friday_expiration.return_value = datetime.date(2025, 12, 31)
         mock_client_instance.find_nearest_strike.return_value = 150.0
 

@@ -29,8 +29,8 @@ def trade(symbol):
         option_chain = client.get_option_chain(symbol)
 
         # Extract unique expirations and strikes
-        expirations = sorted(list(set([contract.expiration_date for contract in option_chain])))
-        strikes = sorted(list(set([contract.strike_price for contract in option_chain])))
+        expirations = sorted(list(set([contract.expiration_date for contract in option_chain.values()])))
+        strikes = sorted(list(set([contract.strike_price for contract in option_chain.values()])))
 
         # 3. Find next Friday expiration
         today = datetime.date.today()
@@ -54,7 +54,7 @@ def trade(symbol):
         # 5. Find the call and put contracts
         call_contract = None
         put_contract = None
-        for contract in option_chain:
+        for contract in option_chain.values():
             if contract.expiration_date == target_expiration_str and contract.strike_price == nearest_strike:
                 if contract.type == 'call':
                     call_contract = contract
