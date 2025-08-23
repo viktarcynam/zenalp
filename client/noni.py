@@ -143,7 +143,7 @@ def main():
                 expirations = sorted(list(set([c.expiration_date for c in contracts])))
 
                 today = datetime.today().date()
-                expirations_in_future = [exp for exp in expirations if exp >= today]
+                expirations_in_future = [exp for exp in expirations if exp > today]
                 if not expirations_in_future:
                     print("No future expiration dates found.")
                     continue
