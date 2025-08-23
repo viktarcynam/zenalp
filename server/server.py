@@ -10,7 +10,14 @@ from common.json_parser import json_parser
 from server.alpaca_service import AlpacaService
 from server.cache_manager import cache_manager
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler("server.log"),
+        logging.StreamHandler(sys.stdout)
+    ]
+)
 logger = logging.getLogger(__name__)
 
 def recv_all(sock, n):
@@ -119,6 +126,7 @@ class AlpacaServer:
                 # The chain object is not directly serializable to JSON
                 # I need to convert it to a dict of dicts
                 chain_dict = {key: value.dict() for key, value in chain.items()}
+                logger.info(f"Sending option chain data: {chain_dict}")
                 return {'success': True, 'data': chain_dict}
 
             elif action == 'get_option_quote':
