@@ -51,12 +51,17 @@ def poll_order_status(client, order_to_monitor):
         current_order_id = order_to_monitor['order_id']
         poll_count = 0
         order_summary = f"{order_to_monitor['side']} {order_to_monitor['quantity']} {order_to_monitor['putCall']} @ {order_to_monitor['price']}"
+        status = "" # To store the latest status
 
         while True:
             rlist, _, _ = select.select([sys.stdin], [], [], 2) # 2-second timeout
             if rlist:
                 char = sys.stdin.read(1).upper()
                 if char == 'A':
+                    if status in ['accepted', 'pending_new', 'pending_cancel', 'pending_replace']:
+                        print(f"\nOrder status is '{status}', cannot be adjusted now.")
+                        continue
+
                     termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_settings)
                     new_price_str = input("\nEnter new limit price: ")
                     try:
@@ -95,9 +100,13 @@ def poll_order_status(client, order_to_monitor):
                     put_bid = put_quote_res.get('data', {}).get(order_to_monitor['put_contract_symbol'], {}).get('bid_price')
                     put_ask = put_quote_res.get('data', {}).get(order_to_monitor['put_contract_symbol'], {}).get('ask_price')
 
-                    print(f"\n[{datetime.now().strftime('%H:%M:%S')}] CALL: {format_price(call_bid)}/{format_price(call_ask)} | PUT: {format_price(put_bid)}/{format_price(put_ask)} | Monitoring: {order_summary} | Status: {status}")
+                    # Clear the line before printing
+                    sys.stdout.write('\r' + ' ' * 120 + '\r')
+                    print(f"[{datetime.now().strftime('%H:%M:%S')}] CALL: {format_price(call_bid)}/{format_price(call_ask)} | PUT: {format_price(put_bid)}/{format_price(put_ask)} | Monitoring: {order_summary} | Status: {status}", end='', flush=True)
                 else:
-                    print(f"Status: {status}", end='\r', flush=True)
+                    # Clear the line before printing
+                    sys.stdout.write('\r' + ' ' * 120 + '\r')
+                    print(f"Status: {status}", end='', flush=True)
 
                 if status == 'filled':
                     print("\nOrder filled!")
