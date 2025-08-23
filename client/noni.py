@@ -58,15 +58,44 @@ def poll_order_status(client, order_to_monitor):
             if rlist:
                 char = sys.stdin.read(1).upper()
                 if char == 'A':
-                    if status in ['accepted', 'pending_new', 'pending_cancel', 'pending_replace']:
-                        print(f"\nOrder status is '{status}', cannot be adjusted now.")
-                        continue
-
                     termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_settings)
-                    new_price_str = input("\nEnter new limit price: ")
-                    try:
-                        new_price = float(new_price_str)
-                        replace_res = client.send_request({'action': 'replace_order', 'order_id': current_order_id, 'limit_price': new_price})
+
+                    if status in ['accepted', 'pending_new', 'pending_cancel', 'pending_replace']:
+                        print(f"\nOrder status is '{status}', cannot be modified directly.")
+                        if input("Cancel and replace with a new order? (y/n): ").lower() == 'y':
+                            # Cancel/Replace logic here
+                            print("Canceling original order...")
+                            cancel_res = client.send_request({'action': 'cancel_order', 'order_id': current_order_id})
+                            if cancel_res.get('success'):
+                                print("Order canceled. Enter new limit price for the new order: ")
+                                new_price_str = input()
+                                try:
+                                    new_price = float(new_price_str)
+                                    # Create a new order with the same params but new price
+                                    new_order_res = client.send_request({
+                                        'action': 'place_order', 'symbol': order_to_monitor['call_contract_symbol'] if order_to_monitor['putCall'] == 'CALL' else order_to_monitor['put_contract_symbol'],
+                                        'qty': order_to_monitor['quantity'], 'side': order_to_monitor['side'], 'limit_price': new_price
+                                    })
+                                    print_response("New Order Response", new_order_res)
+                                    if new_order_res.get('success'):
+                                        # Update the monitoring info to the new order
+                                        current_order_id = new_order_res['data']['id']
+                                        order_to_monitor['order_id'] = current_order_id
+                                        order_to_monitor['price'] = new_price
+                                        order_summary = f"{order_to_monitor['side']} {order_to_monitor['quantity']} {order_to_monitor['putCall']} @ {order_to_monitor['price']}"
+                                        print(f"Now monitoring new order ID: {current_order_id}")
+                                except ValueError:
+                                    print("Invalid price.")
+                            else:
+                                print(f"Failed to cancel order: {cancel_res.get('error')}")
+                        else:
+                            print("Adjustment aborted.")
+
+                    else: # If status is replaceable
+                        new_price_str = input("\nEnter new limit price: ")
+                        try:
+                            new_price = float(new_price_str)
+                            replace_res = client.send_request({'action': 'replace_order', 'order_id': current_order_id, 'limit_price': new_price})
                         print_response("Replace Order Response", replace_res)
                         if replace_res.get('success'):
                             current_order_id = replace_res['data']['id']
@@ -229,7 +258,7 @@ def main():
                     "strike": nearest_strike,
                     "expiry": target_expiration.strftime('%Y-%m-%d'),
                     "putCall": "CALL" if opt_type == 'C' else "PUT",
-                    "side": side,
+                    "side": "buy" if side == 'B' else "sell",
                     "quantity": qty,
                     "price": price,
                     "call_contract_symbol": call_contract.symbol,
