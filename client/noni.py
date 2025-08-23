@@ -42,11 +42,16 @@ def get_input(prompt):
     finally:
         termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_settings)
 
-def poll_order_status(client, order_id):
+def poll_order_status(client, order_to_monitor):
     print("\nMonitoring order... Press 'A' to adjust, 'Q' to cancel.")
     old_settings = termios.tcgetattr(sys.stdin)
     try:
         tty.setcbreak(sys.stdin.fileno())
+
+        current_order_id = order_to_monitor['order_id']
+        poll_count = 0
+        order_summary = f"{order_to_monitor['side']} {order_to_monitor['quantity']} {order_to_monitor['putCall']} @ {order_to_monitor['price']}"
+
         while True:
             rlist, _, _ = select.select([sys.stdin], [], [], 2) # 2-second timeout
             if rlist:
@@ -56,11 +61,14 @@ def poll_order_status(client, order_id):
                     new_price_str = input("\nEnter new limit price: ")
                     try:
                         new_price = float(new_price_str)
-                        replace_res = client.send_request({'action': 'replace_order', 'order_id': order_id, 'limit_price': new_price})
+                        replace_res = client.send_request({'action': 'replace_order', 'order_id': current_order_id, 'limit_price': new_price})
                         print_response("Replace Order Response", replace_res)
                         if replace_res.get('success'):
-                            order_id = replace_res['data']['id']
-                            print(f"Order replaced. New order ID: {order_id}")
+                            current_order_id = replace_res['data']['id']
+                            order_to_monitor['order_id'] = current_order_id
+                            order_to_monitor['price'] = new_price
+                            order_summary = f"{order_to_monitor['side']} {order_to_monitor['quantity']} {order_to_monitor['putCall']} @ {order_to_monitor['price']}"
+                            print(f"Order replaced. New order ID: {current_order_id}")
                     except ValueError:
                         print("Invalid price.")
                     finally:
@@ -68,15 +76,29 @@ def poll_order_status(client, order_id):
                 elif char == 'Q':
                     termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_settings)
                     if input("Are you sure you want to cancel? (y/n): ").lower() == 'y':
-                        cancel_res = client.send_request({'action': 'cancel_order', 'order_id': order_id})
+                        cancel_res = client.send_request({'action': 'cancel_order', 'order_id': current_order_id})
                         print_response("Cancel Order Response", cancel_res)
                         return None # Order canceled
                     tty.setcbreak(sys.stdin.fileno())
 
-            status_res = client.send_request({'action': 'get_order_by_id', 'order_id': order_id})
+            poll_count += 1
+            status_res = client.send_request({'action': 'get_order_by_id', 'order_id': current_order_id})
             if status_res.get('success'):
                 status = status_res['data']['status']
-                print(f"Status: {status}", end='\r', flush=True)
+
+                if poll_count % 4 == 1: # Print on the first poll and then every 4th
+                    call_quote_res = client.send_request({'action': 'get_option_quote', 'symbol': order_to_monitor['call_contract_symbol']})
+                    put_quote_res = client.send_request({'action': 'get_option_quote', 'symbol': order_to_monitor['put_contract_symbol']})
+
+                    call_bid = call_quote_res.get('data', {}).get(order_to_monitor['call_contract_symbol'], {}).get('bid_price')
+                    call_ask = call_quote_res.get('data', {}).get(order_to_monitor['call_contract_symbol'], {}).get('ask_price')
+                    put_bid = put_quote_res.get('data', {}).get(order_to_monitor['put_contract_symbol'], {}).get('bid_price')
+                    put_ask = put_quote_res.get('data', {}).get(order_to_monitor['put_contract_symbol'], {}).get('ask_price')
+
+                    print(f"\n[{datetime.now().strftime('%H:%M:%S')}] CALL: {format_price(call_bid)}/{format_price(call_ask)} | PUT: {format_price(put_bid)}/{format_price(put_ask)} | Monitoring: {order_summary} | Status: {status}")
+                else:
+                    print(f"Status: {status}", end='\r', flush=True)
+
                 if status == 'filled':
                     print("\nOrder filled!")
                     return status_res['data']
@@ -192,7 +214,19 @@ def main():
                 if not order_res.get('success'):
                     print(f"Error placing order: {order_res.get('error')}"); continue
 
-                filled_order = poll_order_status(client, order_res['data']['id'])
+                order_to_monitor = {
+                    "order_id": order_res['data']['id'],
+                    "symbol": symbol,
+                    "strike": nearest_strike,
+                    "expiry": target_expiration.strftime('%Y-%m-%d'),
+                    "putCall": "CALL" if opt_type == 'C' else "PUT",
+                    "side": side,
+                    "quantity": qty,
+                    "price": price,
+                    "call_contract_symbol": call_contract.symbol,
+                    "put_contract_symbol": put_contract.symbol,
+                }
+                filled_order = poll_order_status(client, order_to_monitor)
                 if filled_order:
                     print("Closing order workflow not implemented yet.")
 
