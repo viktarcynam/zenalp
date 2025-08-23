@@ -20,6 +20,7 @@ class JSONRequestParser:
         'place_order',
         'cancel_order',
         'replace_order',
+        'get_order_by_id',
     }
 
     REQUIRED_PARAMS = {
@@ -30,6 +31,7 @@ class JSONRequestParser:
         'cancel_order': ['order_id'],
         'replace_order': ['order_id', 'limit_price'],
         'get_positions': [],
+        'get_order_by_id': ['order_id'],
     }
 
     OPTIONAL_PARAMS = {
