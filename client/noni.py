@@ -107,7 +107,16 @@ def main():
                 if not chain_res.get('success'):
                     print(f"Error: {chain_res.get('error')}"); continue
 
-                contracts = [SimpleContract(d) for d in (json.loads(json.dumps(v, default=str)) for v in chain_res['data'].values())]
+                contracts = []
+                if chain_res.get('data'):
+                    for option_symbol in chain_res['data'].keys():
+                        parsed_data = parse_option_symbol(option_symbol, symbol)
+                        if parsed_data:
+                            contracts.append(SimpleContract(parsed_data))
+
+                if not contracts:
+                    print("No option chain found for this symbol.")
+                    continue
 
                 strikes = sorted(list(set([c.strike_price for c in contracts])))
                 nearest_strike = find_nearest_strike(last_price, strikes)

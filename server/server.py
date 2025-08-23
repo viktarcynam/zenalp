@@ -80,14 +80,9 @@ class AlpacaServer:
                     break
 
                 msg_len = int.from_bytes(header_data, 'big')
-                logger.info(f"Received header. Expecting message of length: {msg_len}")
-
                 data = recv_all(client_socket, msg_len)
                 if not data:
-                    logger.warning("Connection closed while reading message body.")
                     break
-
-                logger.info(f"Received data: {data!r}")
 
                 request = json.loads(data.decode('utf-8'))
                 logger.info(f"Received request from {address}: {request.get('action', 'unknown')}")
@@ -126,7 +121,6 @@ class AlpacaServer:
                 # The chain object is not directly serializable to JSON
                 # I need to convert it to a dict of dicts
                 chain_dict = {key: value.dict() for key, value in chain.items()}
-                logger.info(f"Sending option chain data: {chain_dict}")
                 return {'success': True, 'data': chain_dict}
 
             elif action == 'get_option_quote':
