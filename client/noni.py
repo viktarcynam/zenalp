@@ -118,13 +118,67 @@ def main():
                     print("No option chain found for this symbol.")
                     continue
 
-                strikes = sorted(list(set([c.strike_price for c in contracts])))
-                nearest_strike = find_nearest_strike(last_price, strikes)
+                expirations = sorted(list(set([c.expiration_date for c in contracts])))
 
-                print(f"Nearest strike: {format_price(nearest_strike)}")
+                today = datetime.today().date()
+                expirations_in_future = [exp for exp in expirations if exp >= today]
+                if not expirations_in_future:
+                    print("No future expiration dates found.")
+                    continue
 
-                action = get_input("Action (B/S C/P PRICE QTY): ").upper().split()
-                side, opt_type, price, qty = action[0], action[1], float(action[2]), int(action[3])
+                next_friday = find_next_friday_expiration()
+                target_expiration = min(expirations_in_future, key=lambda d: abs(d - next_friday))
+                print(f"Using expiration date: {target_expiration}")
+
+                # Filter contracts by target expiration
+                contracts_for_expiry = [c for c in contracts if c.expiration_date == target_expiration]
+
+                # Find strikes that have both a call and a put
+                call_strikes = {c.strike_price for c in contracts_for_expiry if c.type == 'call'}
+                put_strikes = {c.strike_price for c in contracts_for_expiry if c.type == 'put'}
+                valid_strikes = sorted(list(call_strikes.intersection(put_strikes)))
+
+                if not valid_strikes:
+                    print(f"No valid call/put pairs found for {target_expiration}.")
+                    continue
+
+                # Find the nearest strike from the valid strikes
+                nearest_strike = find_nearest_strike(last_price, valid_strikes)
+                print(f"Using nearest valid strike: {format_price(nearest_strike)}")
+
+                call_contract = next((c for c in contracts_for_expiry if c.strike_price == nearest_strike and c.type == 'call'), None)
+                put_contract = next((c for c in contracts_for_expiry if c.strike_price == nearest_strike and c.type == 'put'), None)
+
+                call_quote_res = client.send_request({'action': 'get_option_quote', 'symbol': call_contract.symbol})
+                put_quote_res = client.send_request({'action': 'get_option_quote', 'symbol': put_contract.symbol})
+
+                call_bid = call_quote_res.get('data', {}).get(call_contract.symbol, {}).get('bid_price')
+                call_ask = call_quote_res.get('data', {}).get(call_contract.symbol, {}).get('ask_price')
+                put_bid = put_quote_res.get('data', {}).get(put_contract.symbol, {}).get('bid_price')
+                put_ask = put_quote_res.get('data', {}).get(put_contract.symbol, {}).get('ask_price')
+
+                print(f"CALL: {format_price(call_bid)}/{format_price(call_ask)}  |  PUT: {format_price(put_bid)}/{format_price(put_ask)}")
+
+                action_input = get_input("Action (B/S C/P PRICE [QTY]): ").upper().split()
+
+                if len(action_input) < 3:
+                    print("Invalid action format. Use: B/S C/P PRICE [QTY]")
+                    continue
+
+                side, opt_type, price_str = action_input[0], action_input[1], action_input[2]
+                qty = 1
+                if len(action_input) == 4:
+                    try:
+                        qty = int(action_input[3])
+                    except ValueError:
+                        print("Invalid quantity. Must be an integer.")
+                        continue
+
+                try:
+                    price = float(price_str)
+                except ValueError:
+                    print("Invalid price. Must be a number.")
+                    continue
 
                 target_contract = next((c for c in contracts if c.strike_price == nearest_strike and c.type == ('call' if opt_type == 'C' else 'put')), None)
                 if not target_contract:
