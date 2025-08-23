@@ -7,72 +7,63 @@ from alpaca.trading.requests import MarketOrderRequest, LimitOrderRequest, Repla
 from alpaca.trading.enums import OrderSide, TimeInForce
 from alpaca.data.requests import StockLatestQuoteRequest, OptionChainRequest, OptionLatestQuoteRequest
 import datetime
+import logging
 
-class AlpacaClient:
+class AlpacaService:
     """
-    A client for interacting with the Alpaca API.
+    A service for interacting with the Alpaca API.
     """
 
     def __init__(self):
         """
-        Initializes the AlpacaClient.
+        Initializes the AlpacaService.
         """
         load_dotenv()
         self.api_key = os.getenv("APCA_API_KEY_ID")
         self.secret_key = os.getenv("APCA_API_SECRET_KEY")
+        self.trading_client = None
+        self.option_data_client = None
+        self.stock_data_client = None
 
         if not self.api_key or not self.secret_key:
             raise ValueError("API keys not found. Please set APCA_API_KEY_ID and APCA_API_SECRET_KEY environment variables.")
 
-        self.trading_client = TradingClient(self.api_key, self.secret_key, paper=True)
-        self.option_data_client = OptionHistoricalDataClient(self.api_key, self.secret_key)
-        self.stock_data_client = StockHistoricalDataClient(self.api_key, self.secret_key)
+        try:
+            self.trading_client = TradingClient(self.api_key, self.secret_key, paper=True)
+            self.option_data_client = OptionHistoricalDataClient(self.api_key, self.secret_key)
+            self.stock_data_client = StockHistoricalDataClient(self.api_key, self.secret_key)
+            # A simple check to see if keys are valid
+            self.trading_client.get_account()
+        except Exception as e:
+            logging.warning(f"Could not initialize Alpaca clients, possibly due to invalid keys. API calls will fail. Error: {e}")
+            self.trading_client = None
+            self.option_data_client = None
+            self.stock_data_client = None
+
+    def _check_clients(self):
+        if not self.trading_client or not self.option_data_client or not self.stock_data_client:
+            raise Exception("Alpaca clients not initialized. Check API keys.")
 
     def get_latest_stock_price(self, symbol: str) -> float:
-        """
-        Gets the latest price of an underlying asset.
-        """
+        self._check_clients()
         request_params = StockLatestQuoteRequest(symbol_or_symbols=symbol)
         latest_quote = self.stock_data_client.get_stock_latest_quote(request_params)
         return latest_quote[symbol].ask_price
 
     def get_option_chain(self, symbol: str) -> dict:
-        """
-        Gets the option chain for a given symbol.
-        """
+        self._check_clients()
         request_params = OptionChainRequest(underlying_symbol=symbol)
         option_chain = self.option_data_client.get_option_chain(request_params)
         return option_chain
 
-    def find_nearest_strike(self, current_price: float, strikes: list[float]) -> float:
-        """
-        Finds the nearest strike price to the current price.
-        """
-        return min(strikes, key=lambda x: abs(x - current_price))
-
-    def find_next_friday_expiration(self) -> datetime.date:
-        """
-        Finds the upcoming Friday expiration date. If today is Friday, it returns next Friday.
-        """
-        today = datetime.date.today()
-        days_until_friday = (4 - today.weekday() + 7) % 7
-        next_friday = today + datetime.timedelta(days=days_until_friday)
-        if next_friday == today:
-            next_friday += datetime.timedelta(days=7)
-        return next_friday
-
     def get_option_quote(self, symbol: str) -> dict:
-        """
-        Gets the latest quote for an option contract.
-        """
+        self._check_clients()
         request_params = OptionLatestQuoteRequest(symbol_or_symbols=symbol)
         latest_quote = self.option_data_client.get_option_latest_quote(request_params)
         return latest_quote
 
     def place_order(self, symbol: str, qty: float, side: OrderSide, limit_price: float) -> dict:
-        """
-        Places a limit order.
-        """
+        self._check_clients()
         order_data = LimitOrderRequest(
             symbol=symbol,
             qty=qty,
@@ -84,34 +75,24 @@ class AlpacaClient:
         return order
 
     def get_orders(self):
-        """
-        Gets all orders.
-        """
+        self._check_clients()
         return self.trading_client.get_orders()
 
     def get_order_by_id(self, order_id: str):
-        """
-        Gets an order by its ID.
-        """
+        self._check_clients()
         return self.trading_client.get_order_by_id(order_id)
 
     def cancel_order(self, order_id: str):
-        """
-        Cancels an order.
-        """
+        self._check_clients()
         return self.trading_client.cancel_order_by_id(order_id)
 
     def replace_order(self, order_id: str, new_limit_price: float):
-        """
-        Replaces an order.
-        """
+        self._check_clients()
         replace_order_data = ReplaceOrderRequest(
             limit_price=new_limit_price
         )
         return self.trading_client.replace_order_by_id(order_id, replace_order_data)
 
     def get_positions(self):
-        """
-        Gets all positions.
-        """
+        self._check_clients()
         return self.trading_client.get_all_positions()
