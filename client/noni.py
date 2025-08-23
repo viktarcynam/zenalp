@@ -63,7 +63,6 @@ def poll_order_status(client, order_to_monitor):
                     if status in ['accepted', 'pending_new', 'pending_cancel', 'pending_replace']:
                         print(f"\nOrder status is '{status}', cannot be modified directly.")
                         if input("Cancel and replace with a new order? (y/n): ").lower() == 'y':
-                            # Cancel/Replace logic here
                             print("Canceling original order...")
                             cancel_res = client.send_request({'action': 'cancel_order', 'order_id': current_order_id})
                             if cancel_res.get('success'):
@@ -71,14 +70,12 @@ def poll_order_status(client, order_to_monitor):
                                 new_price_str = input()
                                 try:
                                     new_price = float(new_price_str)
-                                    # Create a new order with the same params but new price
                                     new_order_res = client.send_request({
                                         'action': 'place_order', 'symbol': order_to_monitor['call_contract_symbol'] if order_to_monitor['putCall'] == 'CALL' else order_to_monitor['put_contract_symbol'],
                                         'qty': order_to_monitor['quantity'], 'side': order_to_monitor['side'], 'limit_price': new_price
                                     })
                                     print_response("New Order Response", new_order_res)
                                     if new_order_res.get('success'):
-                                        # Update the monitoring info to the new order
                                         current_order_id = new_order_res['data']['id']
                                         order_to_monitor['order_id'] = current_order_id
                                         order_to_monitor['price'] = new_price
@@ -90,21 +87,20 @@ def poll_order_status(client, order_to_monitor):
                                 print(f"Failed to cancel order: {cancel_res.get('error')}")
                         else:
                             print("Adjustment aborted.")
-
                     else: # If status is replaceable
                         new_price_str = input("\nEnter new limit price: ")
                         try:
                             new_price = float(new_price_str)
                             replace_res = client.send_request({'action': 'replace_order', 'order_id': current_order_id, 'limit_price': new_price})
-                        print_response("Replace Order Response", replace_res)
-                        if replace_res.get('success'):
-                            current_order_id = replace_res['data']['id']
-                            order_to_monitor['order_id'] = current_order_id
-                            order_to_monitor['price'] = new_price
-                            order_summary = f"{order_to_monitor['side']} {order_to_monitor['quantity']} {order_to_monitor['putCall']} @ {order_to_monitor['price']}"
-                            print(f"Order replaced. New order ID: {current_order_id}")
-                    except ValueError:
-                        print("Invalid price.")
+                            print_response("Replace Order Response", replace_res)
+                            if replace_res.get('success'):
+                                current_order_id = replace_res['data']['id']
+                                order_to_monitor['order_id'] = current_order_id
+                                order_to_monitor['price'] = new_price
+                                order_summary = f"{order_to_monitor['side']} {order_to_monitor['quantity']} {order_to_monitor['putCall']} @ {order_to_monitor['price']}"
+                                print(f"Order replaced. New order ID: {current_order_id}")
+                        except ValueError:
+                            print("Invalid price.")
                     finally:
                         tty.setcbreak(sys.stdin.fileno())
                 elif char == 'Q':
@@ -120,7 +116,7 @@ def poll_order_status(client, order_to_monitor):
             if status_res.get('success'):
                 status = status_res['data']['status']
 
-                if poll_count % 4 == 1: # Print on the first poll and then every 4th
+                if poll_count % 4 == 1:
                     call_quote_res = client.send_request({'action': 'get_option_quote', 'symbol': order_to_monitor['call_contract_symbol']})
                     put_quote_res = client.send_request({'action': 'get_option_quote', 'symbol': order_to_monitor['put_contract_symbol']})
 
@@ -129,11 +125,9 @@ def poll_order_status(client, order_to_monitor):
                     put_bid = put_quote_res.get('data', {}).get(order_to_monitor['put_contract_symbol'], {}).get('bid_price')
                     put_ask = put_quote_res.get('data', {}).get(order_to_monitor['put_contract_symbol'], {}).get('ask_price')
 
-                    # Clear the line before printing
                     sys.stdout.write('\r' + ' ' * 120 + '\r')
                     print(f"[{datetime.now().strftime('%H:%M:%S')}] CALL: {format_price(call_bid)}/{format_price(call_ask)} | PUT: {format_price(put_bid)}/{format_price(put_ask)} | Monitoring: {order_summary} | Status: {status}", end='', flush=True)
                 else:
-                    # Clear the line before printing
                     sys.stdout.write('\r' + ' ' * 120 + '\r')
                     print(f"Status: {status}", end='', flush=True)
 
@@ -190,10 +184,8 @@ def main():
                 target_expiration = min(expirations_in_future, key=lambda d: abs(d - next_friday))
                 print(f"Using expiration date: {target_expiration}")
 
-                # Filter contracts by target expiration
                 contracts_for_expiry = [c for c in contracts if c.expiration_date == target_expiration]
 
-                # Find strikes that have both a call and a put
                 call_strikes = {c.strike_price for c in contracts_for_expiry if c.type == 'call'}
                 put_strikes = {c.strike_price for c in contracts_for_expiry if c.type == 'put'}
                 valid_strikes = sorted(list(call_strikes.intersection(put_strikes)))
@@ -202,7 +194,6 @@ def main():
                     print(f"No valid call/put pairs found for {target_expiration}.")
                     continue
 
-                # Find the nearest strike from the valid strikes
                 nearest_strike = find_nearest_strike(last_price, valid_strikes)
                 print(f"Using nearest valid strike: {format_price(nearest_strike)}")
 
@@ -240,7 +231,7 @@ def main():
                     print("Invalid price. Must be a number.")
                     continue
 
-                target_contract = next((c for c in contracts if c.strike_price == nearest_strike and c.type == ('call' if opt_type == 'C' else 'put')), None)
+                target_contract = next((c for c in contracts_for_expiry if c.strike_price == nearest_strike and c.type == ('call' if opt_type == 'C' else 'put')), None)
                 if not target_contract:
                     print("Could not find specified contract."); continue
 
