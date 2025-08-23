@@ -59,16 +59,15 @@ def poll_order_status(client, order_to_monitor):
                 char = sys.stdin.read(1).upper()
                 if char == 'A':
                     termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_settings)
-
-                    if status in ['accepted', 'pending_new', 'pending_cancel', 'pending_replace']:
-                        print(f"\nOrder status is '{status}', cannot be modified directly.")
-                        if input("Cancel and replace with a new order? (y/n): ").lower() == 'y':
-                            print("Canceling original order...")
-                            cancel_res = client.send_request({'action': 'cancel_order', 'order_id': current_order_id})
-                            if cancel_res.get('success'):
-                                print("Order canceled. Enter new limit price for the new order: ")
-                                new_price_str = input()
-                                try:
+                    try:
+                        if status in ['accepted', 'pending_new', 'pending_cancel', 'pending_replace']:
+                            print(f"\nOrder status is '{status}', cannot be modified directly.")
+                            if input("Cancel and replace with a new order? (y/n): ").lower() == 'y':
+                                print("Canceling original order...")
+                                cancel_res = client.send_request({'action': 'cancel_order', 'order_id': current_order_id})
+                                if cancel_res.get('success'):
+                                    print("Order canceled. Enter new limit price for the new order: ")
+                                    new_price_str = input()
                                     new_price = float(new_price_str)
                                     new_order_res = client.send_request({
                                         'action': 'place_order', 'symbol': order_to_monitor['call_contract_symbol'] if order_to_monitor['putCall'] == 'CALL' else order_to_monitor['put_contract_symbol'],
@@ -81,15 +80,12 @@ def poll_order_status(client, order_to_monitor):
                                         order_to_monitor['price'] = new_price
                                         order_summary = f"{order_to_monitor['side']} {order_to_monitor['quantity']} {order_to_monitor['putCall']} @ {order_to_monitor['price']}"
                                         print(f"Now monitoring new order ID: {current_order_id}")
-                                except ValueError:
-                                    print("Invalid price.")
+                                else:
+                                    print(f"Failed to cancel order: {cancel_res.get('error')}")
                             else:
-                                print(f"Failed to cancel order: {cancel_res.get('error')}")
-                        else:
-                            print("Adjustment aborted.")
-                    else: # If status is replaceable
-                        new_price_str = input("\nEnter new limit price: ")
-                        try:
+                                print("Adjustment aborted.")
+                        else: # If status is replaceable
+                            new_price_str = input("\nEnter new limit price: ")
                             new_price = float(new_price_str)
                             replace_res = client.send_request({'action': 'replace_order', 'order_id': current_order_id, 'limit_price': new_price})
                             print_response("Replace Order Response", replace_res)
@@ -99,8 +95,8 @@ def poll_order_status(client, order_to_monitor):
                                 order_to_monitor['price'] = new_price
                                 order_summary = f"{order_to_monitor['side']} {order_to_monitor['quantity']} {order_to_monitor['putCall']} @ {order_to_monitor['price']}"
                                 print(f"Order replaced. New order ID: {current_order_id}")
-                        except ValueError:
-                            print("Invalid price.")
+                    except ValueError:
+                        print("Invalid price.")
                     finally:
                         tty.setcbreak(sys.stdin.fileno())
                 elif char == 'Q':
